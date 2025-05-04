@@ -8,7 +8,7 @@
 
 **[PLACEHOLDER]** Official implementation of **"Action-Minimization Meets Generative Modeling: Efficient Transition Path Sampling with the Onsager-Machlup Functional"**, by Sanjeev Raja, Martin Šípka, Michael Psenka, Tobias Kreiman, Michal Pavelka, and Aditi S. Krishnapriyan. 
 
-We introduce a method to zero-shot repurpose pretrained generative models of atomistic conformational ensembles to produce dynamical transition pathways, by interpreting candidate paths as realization of an SDE induced by the learned score function of the generative model. Our approach is compatible with any diffusion or flow matching generative model that can produce i.i.d conformational samples of a molecular system.
+We introduce a method to zero-shot repurpose pretrained generative models of atomistic conformational ensembles to produce dynamical transition pathways, by interpreting candidate paths as a realization of an SDE induced by the learned score function of the generative model. Our approach is compatible with any diffusion or flow matching generative model that can produce i.i.d conformational samples of a molecular system.
 
 
 **Code is coming very soon, please stay tuned!**
