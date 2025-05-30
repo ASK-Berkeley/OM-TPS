@@ -1,7 +1,7 @@
 # Fast Folding Proteins and Tetrapeptides
 
 ## Requirements
-Make sure the ```om-tps``` conda environment is set up as described [here](../README.md)
+Make sure the ```om-tps``` and ```openmm-env```conda environments are set up as described [here](../README.md)
 
 ### Data
 #### Fast Folding Proteins
