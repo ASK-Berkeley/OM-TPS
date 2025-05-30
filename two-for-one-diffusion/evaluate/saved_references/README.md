@@ -1,0 +1,2 @@
+# Saved references
+This folder contains pre-saved reference distributions, TIC models, MSM cluster info (endpoint coordinates, transition matrices, etc.) that can be used in evaluation such that reference data is not explicitly needed.
