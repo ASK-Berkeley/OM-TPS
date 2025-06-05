@@ -304,7 +304,7 @@ class FlowMatching(nn.Module):
             print("Large molecule encountered in sampling")
             sol = torch.clamp(sol, min=-1000, max=1000)
 
-        return sol * 3.6533  # * self.norm_factor
+        return sol * self.norm_factor
 
     def q_sample(self, x_start, t, noise=None):
         """
