@@ -13,7 +13,9 @@ Official implementation of **"Action-Minimization Meets Generative Modeling: Eff
 <p align="center">
 </p>
 
-We introduce a method to zero-shot repurpose pretrained generative models of atomistic conformational ensembles to produce dynamical transition pathways, by interpreting candidate paths as a realization of an SDE induced by the learned score function of the generative model. Our approach is compatible with any diffusion or flow matching generative model that can produce i.i.d conformational samples of a molecular system.
+We introduce a method to zero-shot repurpose pretrained generative models of atomistic conformational ensembles to produce dynamical transition pathways, by interpreting candidate paths as a realization of an SDE induced by the learned score function of the generative model. We then use the Onsager-Machlup (OM) action to find maximum likelihood paths under this SDE. Our approach is compatible with any diffusion or flow matching generative model that can produce i.i.d conformational samples of a molecular system.
+
+![Method Animation](assets/om_animation_protein.gif)
 
 ## Environment Setup
 
