@@ -1,6 +1,6 @@
 # Fast Folding Proteins and Tetrapeptides
 
-![Method Animation](assets/om_animation_protein.gif)
+![Method Animation](../assets/om_animation_protein.gif)
 
 ## Requirements
 Make sure the ```om-tps``` and ```openmm-env```conda environments are set up as described [here](../README.md)
