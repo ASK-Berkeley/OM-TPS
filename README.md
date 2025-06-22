@@ -3,6 +3,10 @@
   <a href="https://arxiv.org/abs/2504.18506">
     <img src="https://img.shields.io/badge/arXiv-b31b1b?style=for-the-badge&logo=arxiv" alt="arXiv"/>
   </a>
+  <!-- <a href="https://www.youtube.com/watch?v=YAWo8gKi7b4&t=3s&ab_channel=ValenceLabs"><img src="https://img.shields.io/badge/Watch%20Talk-FF0000?logo=youtube&logoColor=white" alt="LoGaG Talk"/></a> -->
+  <a href="https://www.youtube.com/watch?v=YAWo8gKi7b4&t=3s&ab_channel=ValenceLabs">
+      <img src="https://img.shields.io/badge/Watch%20Talk-FF0000?logo=youtube&logoColor=white&style=for-the-badge" height="28">
+  </a>
 </p>
 
 Official implementation of **"Action-Minimization Meets Generative Modeling: Efficient Transition Path Sampling with the Onsager-Machlup Functional"**, by Sanjeev Raja, Martin Šípka, Michael Psenka, Tobias Kreiman, Michal Pavelka, and Aditi S. Krishnapriyan. 
