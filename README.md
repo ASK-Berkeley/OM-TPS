@@ -6,10 +6,14 @@
   <a href="https://www.youtube.com/watch?v=YAWo8gKi7b4&t=3s&ab_channel=ValenceLabs">
     <img src="https://img.shields.io/badge/Watch%20Talk-FF0000?logo=youtube&logoColor=white&style=for-the-badge" height="28" alt="LoGaG Talk"/>
   </a>
+  <a href="https://x.com/ask1729/status/1938259787462197480">
+    <img src="https://img.shields.io/badge/X%20Thread-1DA1F2?logo=x&logoColor=white&style=for-the-badge" alt="X Thread"/>
+  </a>
   <a href="https://github.com/ASK-Berkeley/OM-TPS/blob/main/muller-brown/mb_diffusion.ipynb">
     <img src="https://img.shields.io/badge/Quick--Start%20Jupyter%20Notebook-3776AB?logo=jupyter&logoColor=white&style=for-the-badge" alt="Quick-Start Jupyter Notebook"/>
   </a>
 </p>
+
 
 
 Official implementation of **"Action-Minimization Meets Generative Modeling: Efficient Transition Path Sampling with the Onsager-Machlup Functional"**, by Sanjeev Raja, Martin Šípka, Michael Psenka, Tobias Kreiman, Michal Pavelka, and Aditi S. Krishnapriyan, to appear at ICML 2025 in Vancouver.
