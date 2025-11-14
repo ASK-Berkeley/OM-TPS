@@ -16,7 +16,7 @@
 
 
 
-Official implementation of **"Action-Minimization Meets Generative Modeling: Efficient Transition Path Sampling with the Onsager-Machlup Functional"**, by Sanjeev Raja, Martin Šípka, Michael Psenka, Tobias Kreiman, Michal Pavelka, and Aditi S. Krishnapriyan, to appear at ICML 2025 in Vancouver.
+Official implementation of **"Action-Minimization Meets Generative Modeling: Efficient Transition Path Sampling with the Onsager-Machlup Functional"**, by Sanjeev Raja, Martin Šípka, Michael Psenka, Tobias Kreiman, Michal Pavelka, and Aditi S. Krishnapriyan, which appeared at ICML 2025 in Vancouver.
 
 <p align="center">
 <img src="assets/conceptual_figure.png" alt=""/>
