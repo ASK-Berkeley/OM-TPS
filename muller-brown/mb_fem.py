@@ -13,6 +13,92 @@ import numpy as np
 from mb_calculator import MullerBrownPotential
 import os
 
+
+# Define UserExpression classes to avoid C++ code generation issues
+class MBComponent(UserExpression):
+    """Muller-Brown potential component"""
+    def __init__(self, A, a, b, c, x_ref, y_ref, **kwargs):
+        self.A = A
+        self.a = a
+        self.b = b
+        self.c = c
+        self.x_ref = x_ref
+        self.y_ref = y_ref
+        super().__init__(**kwargs)
+    
+    def eval(self, values, x):
+        dx = x[0] - self.x_ref
+        dy = x[1] - self.y_ref
+        values[0] = self.A * np.exp(self.a * dx * dx + self.b * dx * dy + self.c * dy * dy)
+    
+    def value_shape(self):
+        return ()
+
+
+class MBComponentExp(UserExpression):
+    """Exponential of Muller-Brown component for Boltzmann weight"""
+    def __init__(self, A, a, b, c, x_ref, y_ref, beta, **kwargs):
+        self.A = A
+        self.a = a
+        self.b = b
+        self.c = c
+        self.x_ref = x_ref
+        self.y_ref = y_ref
+        self.beta = beta
+        super().__init__(**kwargs)
+    
+    def eval(self, values, x):
+        dx = x[0] - self.x_ref
+        dy = x[1] - self.y_ref
+        energy = self.A * np.exp(self.a * dx * dx + self.b * dx * dy + self.c * dy * dy)
+        values[0] = np.exp(-self.beta * energy)
+    
+    def value_shape(self):
+        return ()
+
+
+class MBComponentGradX(UserExpression):
+    """X-gradient of Muller-Brown component"""
+    def __init__(self, A, a, b, c, x_ref, y_ref, **kwargs):
+        self.A = A
+        self.a = a
+        self.b = b
+        self.c = c
+        self.x_ref = x_ref
+        self.y_ref = y_ref
+        super().__init__(**kwargs)
+    
+    def eval(self, values, x):
+        dx = x[0] - self.x_ref
+        dy = x[1] - self.y_ref
+        exp_val = np.exp(self.a * dx * dx + self.b * dx * dy + self.c * dy * dy)
+        values[0] = self.A * (2 * self.a * dx + self.b * dy) * exp_val
+    
+    def value_shape(self):
+        return ()
+
+
+class MBComponentGradY(UserExpression):
+    """Y-gradient of Muller-Brown component"""
+    def __init__(self, A, a, b, c, x_ref, y_ref, **kwargs):
+        self.A = A
+        self.a = a
+        self.b = b
+        self.c = c
+        self.x_ref = x_ref
+        self.y_ref = y_ref
+        super().__init__(**kwargs)
+    
+    def eval(self, values, x):
+        dx = x[0] - self.x_ref
+        dy = x[1] - self.y_ref
+        exp_val = np.exp(self.a * dx * dx + self.b * dx * dy + self.c * dy * dy)
+        values[0] = self.A * (self.b * dx + 2 * self.c * dy) * exp_val
+    
+    def value_shape(self):
+        return ()
+
+
 if __name__ == "__main__":
 
     # Create output directory if it doesn't exist
@@ -78,179 +164,34 @@ if __name__ == "__main__":
     u = TrialFunction(V)
     v = TestFunction(V)
 
-    f_0 = Expression(
-        "A_*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_))",
-        degree=2,
-        A_=A[0],
-        a_=alpha[0],
-        b_=beta_[0],
-        c_=gamma[0],
-        x_=x_ref[0],
-        y_=y_ref[0],
-    )
-    f_0_exp = Expression(
-        "exp(-beta*A_*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_)))",
-        degree=2,
-        A_=A[0],
-        a_=alpha[0],
-        b_=beta_[0],
-        c_=gamma[0],
-        x_=x_ref[0],
-        y_=y_ref[0],
-        beta=beta.values().item(),
-    )
-    f_0_x = Expression(
-        "A_*(2*a_*(x[0]-x_)+b_*(x[1]-y_))*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_))",
-        degree=2,
-        A_=A[0],
-        a_=alpha[0],
-        b_=beta_[0],
-        c_=gamma[0],
-        x_=x_ref[0],
-        y_=y_ref[0],
-    )
-    f_0_y = Expression(
-        "A_*(b_*(x[0]-x_)+2*c_*(x[1]-y_))*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_))",
-        degree=2,
-        A_=A[0],
-        a_=alpha[0],
-        b_=beta_[0],
-        c_=gamma[0],
-        x_=x_ref[0],
-        y_=y_ref[0],
-    )
+    # Create expressions using UserExpression to avoid C++ code generation issues
+    beta_val = beta.values().item()
+    
+    f_0 = MBComponent(A[0], alpha[0], beta_[0], gamma[0], x_ref[0], y_ref[0], degree=2)
+    f_0_exp = MBComponentExp(A[0], alpha[0], beta_[0], gamma[0], x_ref[0], y_ref[0], beta_val, degree=2)
+    f_0_x = MBComponentGradX(A[0], alpha[0], beta_[0], gamma[0], x_ref[0], y_ref[0], degree=2)
+    f_0_y = MBComponentGradY(A[0], alpha[0], beta_[0], gamma[0], x_ref[0], y_ref[0], degree=2)
     f_0_grad = as_vector((f_0_x, f_0_y))
 
     # Repeat for f_1
-    f_1 = Expression(
-        "A_*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_))",
-        degree=2,
-        A_=A[1],
-        a_=alpha[1],
-        b_=beta_[1],
-        c_=gamma[1],
-        x_=x_ref[1],
-        y_=y_ref[1],
-    )
-    f_1_exp = Expression(
-        "exp(-beta*A_*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_)))",
-        degree=2,
-        A_=A[1],
-        a_=alpha[1],
-        b_=beta_[1],
-        c_=gamma[1],
-        x_=x_ref[1],
-        y_=y_ref[1],
-        beta=beta.values().item(),
-    )
-    f_1_x = Expression(
-        "A_*(2*a_*(x[0]-x_)+b_*(x[1]-y_))*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_))",
-        degree=2,
-        A_=A[1],
-        a_=alpha[1],
-        b_=beta_[1],
-        c_=gamma[1],
-        x_=x_ref[1],
-        y_=y_ref[1],
-    )
-    f_1_y = Expression(
-        "A_*(b_*(x[0]-x_)+2*c_*(x[1]-y_))*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_))",
-        degree=2,
-        A_=A[1],
-        a_=alpha[1],
-        b_=beta_[1],
-        c_=gamma[1],
-        x_=x_ref[1],
-        y_=y_ref[1],
-    )
+    f_1 = MBComponent(A[1], alpha[1], beta_[1], gamma[1], x_ref[1], y_ref[1], degree=2)
+    f_1_exp = MBComponentExp(A[1], alpha[1], beta_[1], gamma[1], x_ref[1], y_ref[1], beta_val, degree=2)
+    f_1_x = MBComponentGradX(A[1], alpha[1], beta_[1], gamma[1], x_ref[1], y_ref[1], degree=2)
+    f_1_y = MBComponentGradY(A[1], alpha[1], beta_[1], gamma[1], x_ref[1], y_ref[1], degree=2)
     f_1_grad = as_vector((f_1_x, f_1_y))
 
     # Repeat for f_2
-    f_2 = Expression(
-        "A_*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_))",
-        degree=2,
-        A_=A[2],
-        a_=alpha[2],
-        b_=beta_[2],
-        c_=gamma[2],
-        x_=x_ref[2],
-        y_=y_ref[2],
-    )
-    f_2_exp = Expression(
-        "exp(-beta*A_*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_)))",
-        degree=2,
-        A_=A[2],
-        a_=alpha[2],
-        b_=beta_[2],
-        c_=gamma[2],
-        x_=x_ref[2],
-        y_=y_ref[2],
-        beta=beta.values().item(),
-    )
-    f_2_x = Expression(
-        "A_*(2*a_*(x[0]-x_)+b_*(x[1]-y_))*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_))",
-        degree=2,
-        A_=A[2],
-        a_=alpha[2],
-        b_=beta_[2],
-        c_=gamma[2],
-        x_=x_ref[2],
-        y_=y_ref[2],
-    )
-    f_2_y = Expression(
-        "A_*(b_*(x[0]-x_)+2*c_*(x[1]-y_))*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_))",
-        degree=2,
-        A_=A[2],
-        a_=alpha[2],
-        b_=beta_[2],
-        c_=gamma[2],
-        x_=x_ref[2],
-        y_=y_ref[2],
-    )
+    f_2 = MBComponent(A[2], alpha[2], beta_[2], gamma[2], x_ref[2], y_ref[2], degree=2)
+    f_2_exp = MBComponentExp(A[2], alpha[2], beta_[2], gamma[2], x_ref[2], y_ref[2], beta_val, degree=2)
+    f_2_x = MBComponentGradX(A[2], alpha[2], beta_[2], gamma[2], x_ref[2], y_ref[2], degree=2)
+    f_2_y = MBComponentGradY(A[2], alpha[2], beta_[2], gamma[2], x_ref[2], y_ref[2], degree=2)
     f_2_grad = as_vector((f_2_x, f_2_y))
 
     # Repeat for f_3
-    f_3 = Expression(
-        "A_*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_))",
-        degree=2,
-        A_=A[3],
-        a_=alpha[3],
-        b_=beta_[3],
-        c_=gamma[3],
-        x_=x_ref[3],
-        y_=y_ref[3],
-    )
-    f_3_exp = Expression(
-        "exp(-beta*A_*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_)))",
-        degree=2,
-        A_=A[3],
-        a_=alpha[3],
-        b_=beta_[3],
-        c_=gamma[3],
-        x_=x_ref[3],
-        y_=y_ref[3],
-        beta=beta.values().item(),
-    )
-    f_3_x = Expression(
-        "A_*(2*a_*(x[0]-x_)+b_*(x[1]-y_))*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_))",
-        degree=2,
-        A_=A[3],
-        a_=alpha[3],
-        b_=beta_[3],
-        c_=gamma[3],
-        x_=x_ref[3],
-        y_=y_ref[3],
-    )
-    f_3_y = Expression(
-        "A_*(b_*(x[0]-x_)+2*c_*(x[1]-y_))*exp(a_*(x[0]-x_)*(x[0]-x_)+b_*(x[0]-x_)*(x[1]-y_)+c_*(x[1]-y_)*(x[1]-y_))",
-        degree=2,
-        A_=A[3],
-        a_=alpha[3],
-        b_=beta_[3],
-        c_=gamma[3],
-        x_=x_ref[3],
-        y_=y_ref[3],
-    )
+    f_3 = MBComponent(A[3], alpha[3], beta_[3], gamma[3], x_ref[3], y_ref[3], degree=2)
+    f_3_exp = MBComponentExp(A[3], alpha[3], beta_[3], gamma[3], x_ref[3], y_ref[3], beta_val, degree=2)
+    f_3_x = MBComponentGradX(A[3], alpha[3], beta_[3], gamma[3], x_ref[3], y_ref[3], degree=2)
+    f_3_y = MBComponentGradY(A[3], alpha[3], beta_[3], gamma[3], x_ref[3], y_ref[3], degree=2)
     f_3_grad = as_vector((f_3_x, f_3_y))
 
     f_total = f_0 + f_1 + f_2 + f_3
