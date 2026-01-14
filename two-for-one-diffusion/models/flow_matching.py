@@ -770,7 +770,7 @@ class FlowMatching(nn.Module):
                     )
                     denoised_path_list.append(denoised_path_batch)
                 # Concatenate all batches to form the final tensor
-                denoised_path = torch.cat(denoised_path_batch, dim=0)
+                denoised_path = torch.cat(denoised_path_list, dim=0)
             else:
                 denoised_path = path
 
