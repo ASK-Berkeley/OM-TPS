@@ -16,7 +16,7 @@ The code is organized in a series of Jupyter notebooks (all other files contain 
 - ```mb_flowmatch.ipynb```: Trains a flow matching model on samples from 2DMB and performs various flavors of OM optimization. 
 - ```mb_committor_rates.ipynb```: Trains a MLP to estimate the committor function, from which reaction rates are computed using the Backward Kolmogorov Equation (BKE) formalism.
 
-If you would like to re-compute the ground truth transition rate using the Backward Kolmogorov Equation, create a dedicated conda envirnoment, and then run ```python mb_fem.py```:
+If you would like to re-compute the ground truth transition rate using the Backward Kolmogorov Equation, create a dedicated conda envirnoment with fenics/mshr, and then run ```python mb_fem.py```:
 
 ```bash
 # Create mamba environment with Python 3.12
