@@ -2,12 +2,7 @@
 This directory contains the code to reproduce results on the 2D Muller-Brown (MB) potential
 
 ## Download Data
-Run these commands from the ```muller-brown``` directory
-```bash
-wget https://storage.googleapis.com/om-tps/data/data.zip
-unzip data.zip
-```
-This will download the training data for the Muller-Brown potential, as well as samples from the trained diffusion model used for training the committor model.
+To obtain the training data for the Muller-Brown potential, as well as samples from the trained diffusion model used for training the committor model, use this Google Drive [link](https://drive.google.com/file/d/1poldIaEdkkfmWQMn2eiTE9u73rNel5LF/view?usp=sharing) and unzip ```data.zip``` in the ```muller-brown``` directory.
 
 The code is organized in a series of Jupyter notebooks (all other files contain utilities called by these notebooks):
 
