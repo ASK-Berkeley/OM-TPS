@@ -7,12 +7,8 @@ Make sure the ```om-tps``` and ```openmm-env```conda environments are set up as 
 
 ### Data
 #### Fast Folding Proteins
-We provide torch tensors containing coordinates of the coarse-grained fast-folding protein trajectories from D.E.Shaw, from which transition path endpoints are extracted:
-```bash
-cd datasets
-wget https://storage.googleapis.com/om-tps/data/torch_trajectories.zip
-unzip torch_trajectories.zip
-```
+We provide torch tensors containing coordinates of the coarse-grained fast-folding protein trajectories from D.E.Shaw, from which transition path endpoints are extracted.
+Access them at this Google Drive [link](https://drive.google.com/file/d/1ADQfovtGhObHqN5S9JJHl3TnxxzfEeGd/view?usp=sharing). Unzip the ```torch_trajectories.zip``` file and place it in the ```datasets``` folder.
 
 If you would like to train models from scratch, you can request the original trajectory data directly to D.E.Shaw at the following email: Christine.Ueda@deshawresearch.com.
 
