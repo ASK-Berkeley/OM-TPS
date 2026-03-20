@@ -56,7 +56,7 @@ mamba install conda-forge::pdbfixer
 
 
 ## General Code Structure
-The ```muller-brown/``` directory contains code to reproduce the results from the paper on the 2D Muller-Brown potential. The ```two-for-one-diffusion/``` directory contains code to reproduce the results from the paper on D.E.Shaw fast folding proteins and tetrapeptides. See the ```README.md``` in these directories for more specific instructions.
+The ```muller-brown/``` directory contains code to reproduce the results from the paper on the 2D Muller-Brown potential. The ```two-for-one-diffusion/``` directory contains code to reproduce the results from the paper on alanine dipeptide, D.E.Shaw fast folding proteins and tetrapeptides. See the ```README.md``` in these directories for more specific instructions.
 
 
 

@@ -288,3 +288,35 @@ python main_train.py \
     --num_samples 100 \
     --start_from_last_saved False \
 ```
+
+
+
+
+## Alanine Dipeptide
+
+### Transition Path Sampling
+#### Diffusion Model
+```bash
+python sample.py \
+    --model_path saved_models/alanine_dipeptide \
+    --gen_mode om_interpolate \
+    --atom_selection c-alpha \
+    --num_samples_eval 8 \
+    --batch_size_gen 2 \
+    --latent_time 30 \
+    --initial_guess_level 300 \
+    --no_encode_and_decode \
+    --action truncated \
+    --optimizer adam \
+    --lr 2e-2 \
+    --om_dt 2e-3 \
+    --om_gamma 0.7 \
+    --path_length 300 \
+    --path_batch_size 300 \
+    --steps 5000
+```
+
+### Model Pretraining
+```bash
+
+```
