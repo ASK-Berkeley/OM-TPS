@@ -27,6 +27,7 @@ from evaluate.evaluate_fastfolders import (
     CLUSTER_ENDPOINTS,
     CLUSTER_ENDPOINTS_ALL_ATOM,
 )
+from evaluate.evaluate_ala2 import evaluate_ala2, CLUSTER_ENDPOINTS_ALA
 
 from evaluate.evaluate_tetrapeptides import evaluate_tetrapeptide
 from evaluate.evaluators import (
@@ -43,6 +44,10 @@ from utils import (
     filter_by_rmsd,
     slerp,
     cycle,
+)
+from evaluate.evaluators_CGflowmatching import (
+    get_prob,
+    get_torsions,
 )
 from logging_utils import save_ovito_traj
 from actions import TruncatedAction, HutchinsonAction
@@ -337,6 +342,8 @@ def main(samp_args):
         samp_args.temp_sim = samp_args.temp_sim
 
     basic_append = f"_{samp_args.gen_mode}"
+    if samp_args.append_exp_name is None:
+        samp_args.append_exp_name = ""
     transition_removed_append = (
         "_transition_data_removed" if samp_args.transition_data_removed else ""
     )
@@ -351,7 +358,7 @@ def main(samp_args):
 
     samp_args.append_exp_name = (
         basic_append
-        if samp_args.append_exp_name is None
+        if not samp_args.append_exp_name
         else f"{basic_append}_{samp_args.append_exp_name}"
     )
 
@@ -482,8 +489,10 @@ def main(samp_args):
                 name,
                 samp_args.sidechains,
             )
-        except:
+        except Exception as e:
+            import traceback
             print(f"Failed to generate samples for {name}")
+            traceback.print_exc()
             continue
 
 
@@ -504,12 +513,19 @@ def generate_samples(
         iid_sample_path = Path(
             os.path.join(os.path.dirname(eval_folder), "main_eval_output_iid")
         )
-        protein_name = iid_sample_path.parts[-2].split("_")
-
-        if "trp" in protein_name or "protein" in protein_name:
-            protein_name = protein_name[0] + "_" + protein_name[1]  # trp_cage
+        if "alanine" in args.mol:
+            if "fuberlin" in args.mol:
+                fold = iid_sample_path.parts[-2]
+                protein_name = f"alanine_{fold}"
+            else:
+                protein_name = args.mol
         else:
-            protein_name = protein_name[0]
+            protein_name = iid_sample_path.parts[-2].split("_")
+
+            if "trp" in protein_name or "protein" in protein_name:
+                protein_name = protein_name[0] + "_" + protein_name[1]  # trp_cage
+            else:
+                protein_name = protein_name[0]
 
     else:
         protein_name = "tetrapeptide"
@@ -544,9 +560,16 @@ def generate_samples(
             "_all_atom" if samp_args.atom_selection == AtomSelection.PROTEIN else ""
         )
 
-        topology = md.load_topology(
-            f"./datasets/folded_pdbs/{Molecules[protein_name.upper()].value}-0-{samp_args.atom_selection.value}.pdb"
-        )
+        if "alanine" in args.mol:
+            if "fuberlin" in args.mol:
+                topology = md.load_topology(f"./datasets/folded_pdbs/ala2_cg.pdb")
+            else:
+                topology = md.load_topology(f"./datasets/folded_pdbs/ala2.pdb")
+                cg_topology = md.load_topology(f"./datasets/folded_pdbs/ala2_cg.pdb")
+        else:
+            topology = md.load_topology(
+                f"./datasets/folded_pdbs/{Molecules[protein_name.upper()].value}-0-{samp_args.atom_selection.value}.pdb"
+            )
         bonds = None
         if samp_args.atom_selection == AtomSelection.PROTEIN:
             bonds = [(bond[0].index, bond[1].index) for bond in topology.bonds]
@@ -558,7 +581,7 @@ def generate_samples(
 
         # set atomic numbers for all-atom proteins
         z = (
-            [atom.element.number for atom in list(topology.atoms)]
+            torch.tensor([atom.element.number for atom in list(topology.atoms)])
             if samp_args.atom_selection == AtomSelection.PROTEIN
             else None
         )
@@ -639,82 +662,129 @@ def generate_samples(
                 atom_selection="all-atom" if sidechains else "backbone",
             )
         else:
-            # choose two endpoints as cluster centers (calculated from min flux paths)
-            cluster_endpoints_path = Path(
-                os.path.join(
-                    "evaluate",
-                    "saved_references",
-                    f"saved_cluster_endpoints_{protein_name.upper()}{all_atom_append}.npy",
+            if "alanine" in args.mol:
+                clusters = CLUSTER_ENDPOINTS_ALA
+                cluster_centers_path = Path(
+                    os.path.join(
+                        "evaluate",
+                        "saved_references",
+                        f"saved_cluster_centers_alanine_dipeptide.npy",
+                    )
                 )
-            )
+                cluster_coords = np.load(cluster_centers_path)
+                gt_traj_path = "/data/sanjeevr/Ala2Train/trajectories1000.0K.pt"
 
-            # use pre-defined cluster centers (min flux endpoints aren't always reasonable)
-            clusters = (
-                CLUSTER_ENDPOINTS[protein_name]
-                if samp_args.atom_selection == AtomSelection.A_CARBON
-                else CLUSTER_ENDPOINTS_ALL_ATOM[protein_name]
-            )
+                if os.path.exists(gt_traj_path):
+                    gt_traj = (
+                        torch.load(gt_traj_path, weights_only=True)
+                        .reshape(-1, 22, 3)
+                        .numpy()
+                    )
+                    gt_traj_cg = gt_traj[:, [4, 6, 8, 14, 16]]  # Only backbone atoms
+                else:
+                    raise NotImplementedError(
+                        "Alanine dipeptide Ground truth trajectory not found"
+                    )
 
-            cluster_centers_path = Path(
-                os.path.join(
-                    "evaluate",
-                    "saved_references",
-                    f"saved_cluster_centers_{protein_name.upper()}{all_atom_append}.npy",
+                gt_dihedrals = get_torsions(gt_traj_cg, cg_topology)
+                # Compute the distance between each point in the trajectory and each cluster center
+                distances = np.linalg.norm(
+                    gt_dihedrals[::100, np.newaxis] - cluster_coords, axis=2
                 )
-            )
-            cluster_coords = np.load(cluster_centers_path)
 
-            # Load samples from the ground truth simulations to serve as endpoints for interpolation
-            gt_traj_path = os.path.join(
-                "./datasets/torch_trajectories",
-                Molecules[protein_name.upper()].value,
-                (
-                    "gt_traj.pt"
-                    if samp_args.atom_selection == AtomSelection.A_CARBON
-                    else "gt_traj_all_atom_temp.pt"
-                ),
-            )
-            if os.path.exists(gt_traj_path):
-                gt_traj = torch.tensor(torch.load(gt_traj_path)).to(device)
+                # Assign each point in the trajectory to the nearest cluster center
+                cluster_assignments = np.argmin(distances, axis=1)
+                distances_to_start = np.linalg.norm(
+                    gt_dihedrals[::100] - cluster_coords[clusters[0]], axis=1
+                )
+                distances_to_end = np.linalg.norm(
+                    gt_dihedrals[::100] - cluster_coords[clusters[1]], axis=1
+                )
+                # Take 100 closest points to the cluster centers
+                start_points = np.argsort(distances_to_start)[:100]
+                end_points = np.argsort(distances_to_end)[:100]
+
+                # move to torch
+                gt_traj = torch.tensor(gt_traj, device=device)
+                start_points = torch.tensor(start_points, device=device)
+                end_points = torch.tensor(end_points, device=device)
             else:
-                # Assumes access to Reference MD Simulations from D.E.Shaw
-                print(
-                    "Could not find torch trajectories, loading from original dataset"
+                # choose two endpoints as cluster centers (calculated from min flux paths)
+                cluster_endpoints_path = Path(
+                    os.path.join(
+                        "evaluate",
+                        "saved_references",
+                        f"saved_cluster_endpoints_{protein_name.upper()}{all_atom_append}.npy",
+                    )
                 )
-                dataset = DEShawDataset(
-                    data_root="./datasets/Reference_MD_Sims",
-                    molecule=Molecules[protein_name.upper()],
-                    simulation_id=0,
+
+                # use pre-defined cluster centers (min flux endpoints aren't always reasonable)
+                clusters = (
+                    CLUSTER_ENDPOINTS[protein_name]
+                    if samp_args.atom_selection == AtomSelection.A_CARBON
+                    else CLUSTER_ENDPOINTS_ALL_ATOM[protein_name]
+                )
+
+                cluster_centers_path = Path(
+                    os.path.join(
+                        "evaluate",
+                        "saved_references",
+                        f"saved_cluster_centers_{protein_name.upper()}{all_atom_append}.npy",
+                    )
+                )
+                cluster_coords = np.load(cluster_centers_path)
+
+                # Load samples from the ground truth simulations to serve as endpoints for interpolation
+                gt_traj_path = os.path.join(
+                    "./datasets/torch_trajectories",
+                    Molecules[protein_name.upper()].value,
+                    (
+                        "gt_traj.pt"
+                        if samp_args.atom_selection == AtomSelection.A_CARBON
+                        else "gt_traj_all_atom_temp.pt"
+                    ),
+                )
+                if os.path.exists(gt_traj_path):
+                    gt_traj = torch.tensor(torch.load(gt_traj_path)).to(device)
+                else:
+                    # Assumes access to Reference MD Simulations from D.E.Shaw
+                    print(
+                        "Could not find torch trajectories, loading from original dataset"
+                    )
+                    dataset = DEShawDataset(
+                        data_root="./datasets/Reference_MD_Sims",
+                        molecule=Molecules[protein_name.upper()],
+                        simulation_id=0,
+                        atom_selection=samp_args.atom_selection,
+                        return_bond_graph=False,
+                        transform=to_angstrom,
+                        align=False,
+                    )
+                    gt_traj = torch.tensor(dataset.traj.xyz)
+                    torch.save(gt_traj, gt_traj_path)
+                gt_traj = 10 * gt_traj  # convert to angstroms
+                gt_traj -= gt_traj.mean(1, keepdims=True)  # center
+
+                # Get TICA
+                tic_evaluator = TicEvaluator(
+                    val_data=None,
+                    mol_name=protein_name,
+                    eval_folder=eval_folder,
+                    data_folder="./datasets/Reference_MD_Sims",
                     atom_selection=samp_args.atom_selection,
-                    return_bond_graph=False,
-                    transform=to_angstrom,
-                    align=False,
+                    folded_pdb_folder="datasets/folded_pdbs",
+                    bins=101,
+                    evalset="testset",
+                    gt_traj=gt_traj.cpu() / 10,
                 )
-                gt_traj = torch.tensor(dataset.traj.xyz)
-                torch.save(gt_traj, gt_traj_path)
-            gt_traj = 10 * gt_traj  # convert to angstroms
-            gt_traj -= gt_traj.mean(1, keepdims=True)  # center
 
-            # Get TICA
-            tic_evaluator = TicEvaluator(
-                val_data=None,
-                mol_name=protein_name,
-                eval_folder=eval_folder,
-                data_folder="./datasets/Reference_MD_Sims",
-                atom_selection=samp_args.atom_selection,
-                folded_pdb_folder="datasets/folded_pdbs",
-                bins=101,
-                evalset="testset",
-                gt_traj=gt_traj.cpu() / 10,
-            )
+                # assign cluster centers to the ground truth samples (only look at every 100th frame to save time)
+                cluster_assignments, _ = discretize_trajectory(
+                    gt_traj.cpu()[::100], tic_evaluator, cluster_coords
+                )
 
-            # assign cluster centers to the ground truth samples (only look at every 100th frame to save time)
-            cluster_assignments, _ = discretize_trajectory(
-                gt_traj.cpu()[::100], tic_evaluator, cluster_coords
-            )
-
-            start_points = cluster_assignments == clusters[0]
-            end_points = cluster_assignments == clusters[1]
+                start_points = cluster_assignments == clusters[0]
+                end_points = cluster_assignments == clusters[1]
 
             # Sample endpoints from the cluster centers
             endpoint_1 = gt_traj[::100][start_points]
@@ -896,7 +966,7 @@ def generate_samples(
         raise Exception("Wrong argument 'gen_mode'")
 
     # Save generated samples
-    append_name = "_" + name if len(name) > 0 else ""
+    append_name = "_" + name if name is not None and len(name) > 0 else ""
     torch.save(
         (
             sampled_mol[:, z != 0]
@@ -970,7 +1040,7 @@ def generate_samples(
     else:
         traj = torch.clamp(sampled_mol[:1000], -1000, 1000)
 
-        if samp_args.atom_selection == AtomSelection.PROTEIN:
+        if samp_args.atom_selection == AtomSelection.PROTEIN and "alanine" not in args.mol:
             # reorder atoms to match pdb
             traj = traj[:, mae_to_pdb_atom_mapping(protein_name)]
 
@@ -997,6 +1067,20 @@ def generate_samples(
             plot=True,
         )
 
+    elif "alanine" in args.mol:
+        evaluate_ala2(
+            gen_mode=samp_args.gen_mode,
+            append_exp_name=samp_args.original_append_exp_name,
+            checkpoint_folder="./saved_models",
+            reference_folder="./evaluate/saved_references",
+            pdb_folder="./datasets",
+            atom_selection=samp_args.atom_selection,
+            model=model.ema_model,
+            num_paths=samp_args.num_samples_eval,
+            endpoints=clusters if "interpolate" in samp_args.gen_mode else None,
+            log=not samp_args.disable_logging,
+            gif=True,
+        )
     else:
         evaluate_fastfolders(
             protein_name,

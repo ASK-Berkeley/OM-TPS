@@ -57,6 +57,28 @@ python sample.py \
     --steps 5000
 ```
 
+And here is an example for alanine dipeptide:
+
+```bash
+python sample.py \
+    --model_path saved_models/alanine_dipeptide \
+    --gen_mode om_interpolate \
+    --atom_selection protein \
+    --num_samples_eval 8 \
+    --batch_size_gen 2 \
+    --latent_time 30 \
+    --initial_guess_level 300 \
+    --no_encode_and_decode \
+    --action truncated \
+    --optimizer adam \
+    --lr 3e-3 \
+    --om_dt 0.0001 \
+    --om_gamma 0.7 \
+    --path_length 300 \
+    --path_batch_size 300 \
+    --steps 5000
+```
+
 Refer to ```python sample.py --help``` for more sampling options and an explanation of all individual arguments. Exact commands to reproduce results in the paper can be found [here](./evaluate/sampling_commands.md).
 
 ### Evaluation

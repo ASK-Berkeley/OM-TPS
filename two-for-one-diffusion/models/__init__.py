@@ -16,7 +16,7 @@ def get_model(args, trainset, device):
             use_distances=args.use_distances,
             conservative=args.conservative,
             use_bead_identities=args.mol == "tetrapeptides"
-            or args.atom_selection == AtomSelection.PROTEIN,
+            or (args.atom_selection == AtomSelection.PROTEIN and "alanine" not in args.mol),
             heads=args.heads if hasattr(args, "heads") else 8,
             dim_head=args.dim_head if hasattr(args, "dim_head") else 64,
         )

@@ -10,6 +10,7 @@ KB = 0.83144626181  # This is the Boltzmann constant converted from J/K (Kg, m^2
 
 temp_dict = {
     "alanine_dipeptide_fuberlin".upper(): 300,
+    "alanine_dipeptide".upper(): 1000,
     "alanine_dipeptide_mdshare".upper(): 300,
     "tetrapeptides".upper(): 350,
     "CHIGNOLIN": 340,

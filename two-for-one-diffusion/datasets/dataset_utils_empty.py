@@ -91,6 +91,7 @@ norm_stds = {
     "alanine_fold2": 0.944965124130249,
     "alanine_fold3": 0.9452606439590454,
     "alanine_fold4": 0.9454087018966675,
+    "alanine_dipeptide": 1.6529, # all-atom
 }
 
 # default cluster endpoints for testing interpolation
@@ -229,7 +230,32 @@ def get_dataset(
 
     if pdb_folder is None:
         pdb_folder = os.path.join("./datasets/folded_pdbs/")
-    if mol.lower() == "alanine_dipeptide_fuberlin":
+    if mol.lower() == "alanine_dipeptide":
+        # All-atom alanine dipeptide dataset
+
+        dataset = AlanineDipeptideDataset_AllAtom(data_folder)
+
+        if data_folder is not None:
+            print(f"Creating dataset splits")
+            topology = dataset.topology
+            valratio, testratio = 0.1, 0.2
+            num_val = math.floor(valratio * dataset.__len__())
+            num_test = math.floor(testratio * dataset.__len__())
+            num_train = dataset.__len__() - num_val - num_test
+            idx_range = torch.arange(len(dataset))
+            train_idx = idx_range[:num_train]
+            val_idx = idx_range[num_train : num_train + num_val]
+            test_idx = idx_range[num_train + num_val :]
+            trainset = dataset.get_subset(train_idx, topology, train=True)
+            valset = dataset.get_subset(val_idx, topology, train=False)
+            testset = dataset.get_subset(test_idx, topology, train=False)
+
+        else:
+            trainset = dataset
+            valset = dataset
+            testset = dataset
+
+    elif mol.lower() == "alanine_dipeptide_fuberlin":
         assert fold is not None and fold in [
             1,
             2,
@@ -412,7 +438,10 @@ class CGDataset(torch.utils.data.TensorDataset):
             assert "alanine" not in molecule.name.lower()
             self.num_beads = topology.n_residues
         elif "alanine" in molecule.lower():
-            self.num_beads = 5
+            if "fold" in molecule.lower():
+                self.num_beads = 5 # CG
+            else:
+                self.num_beads = 22 # all-atom
         else:
             raise NotImplementedError("Invalid molecule name")
         self.bead_onehot = torch.eye(self.num_beads)
@@ -487,6 +516,23 @@ class FUBerlinAlanine2pDataset(CGDataset):
         self.topology = md.load(os.path.join(pdb_folder, "ala2_cg.pdb")).topology
 
         super().__init__(data_coords, self.topology, f"alanine_fold{fold}", mean0=mean0)
+
+
+class AlanineDipeptideDataset_AllAtom(CGDataset):
+    def __init__(
+        self,
+        data_root: str,
+        transform: Optional[Callable[[Any], Any]] = None,
+        return_bond_graph: bool = False,
+        align: bool = False,
+    ):
+        self.data_root = data_root
+        pdb_file = "./datasets/folded_pdbs/ala2.pdb"
+        self.topology = md.load(pdb_file).topology
+        
+        xyz = None
+
+        super().__init__(xyz, self.topology, "alanine_dipeptide", mean0=True)
 
 
 class TemporalSequence:

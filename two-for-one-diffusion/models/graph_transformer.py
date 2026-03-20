@@ -117,7 +117,7 @@ class GraphTransformer(nn.Module):
 
             padding_idx = None
 
-            if z is not None:
+            if z is not None and self.use_bead_identities:
                 z = z.to(self.device)
                 if len(z.shape) == 1:
                     z = z.unsqueeze(0).repeat(bs, 1)

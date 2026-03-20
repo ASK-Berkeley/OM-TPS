@@ -173,12 +173,12 @@ class Trainer(object):
         self.topology = topology
         if "tetrapeptides" not in self.mol_name:
             self.all_atom_protein_z = (
-                [atom.element.number for atom in list(self.topology.atoms)]
+                torch.tensor([atom.element.number for atom in list(self.topology.atoms)])
                 if args.atom_selection == AtomSelection.PROTEIN
                 else None
             )
 
-            if self.all_atom_protein_z is not None:
+            if self.all_atom_protein_z is not None and "alanine" not in mol_name:
                 # permute to match mae atom order
                 self.all_atom_protein_z = torch.tensor(self.all_atom_protein_z)[
                     mae_to_pdb_atom_mapping(mol_name, forward=False)
@@ -195,7 +195,7 @@ class Trainer(object):
         # Results folder from the new folder name
         self.results_folder = Path(results_folder + "/" + experiment_name)
 
-        if "tetrapeptides" not in self.mol_name:
+        if "tetrapeptides" not in self.mol_name and "alanine" not in self.mol_name:
 
             self.evaluator_val = Evaluator(
                 self.val_data,
@@ -394,7 +394,7 @@ class Trainer(object):
                             create_bonds="tetrapeptides" not in self.mol_name,
                         )
 
-                        if "tetrapeptides" not in self.mol_name:
+                        if "tetrapeptides" not in self.mol_name and "alanine" not in self.mol_name:
                             results_dict = self.evaluator_val.eval(
                                 sampled_mol,
                                 milestone=str(milestone) + "_iid",
@@ -438,7 +438,7 @@ class Trainer(object):
                 milestone="final_iid",
             )
 
-        if self.mol_name != "tetrapeptides":
+        if self.mol_name != "tetrapeptides" and "alanine" not in self.mol_name:
             results_val_dict = self.evaluator_val.eval(
                 sampled_mol, milestone="final_iid_val", save_plots=True
             )
@@ -489,7 +489,7 @@ class Trainer(object):
                             milestone=f"final_langevin_tdiff{langevin_t_diff}",
                         )
 
-                    if "tetrapeptides" not in self.mol_name:
+                    if "tetrapeptides" not in self.mol_name and "alanine" not in self.mol_name:
                         results_val_dict = self.evaluator_val.eval(
                             sampled_mol,
                             milestone=f"final_langevin_tdiff{langevin_t_diff}_val",

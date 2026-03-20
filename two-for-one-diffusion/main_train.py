@@ -426,7 +426,12 @@ if __name__ == "__main__":
             loss_weights=args.loss_weights,
         )
 
-    if "tetrapeptides" in args.mol:
+    if "alanine" in args.mol:
+        if "fold" in args.mol:
+            topology = md.load_topology(f"./datasets/folded_pdbs/ala2_cg.pdb") # CG
+        else:
+            topology = md.load_topology(f"./datasets/folded_pdbs/ala2.pdb") # All atom
+    elif "tetrapeptides" in args.mol:
         topology = trainset.topoloy if hasattr(trainset, "topology") else None
     else:
         topology = md.load_topology(

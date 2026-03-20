@@ -850,9 +850,9 @@ class GaussianDiffusion(nn.Module):
         return {
             "final_path": all_denoised_paths[-1],
             "all_paths": torch.stack(all_denoised_paths),
-            "actions": torch.tensor(actions),
-            "path_terms": torch.tensor(path_terms),
-            "force_terms": torch.tensor(force_terms),
+            "actions": torch.tensor(actions, device=self.device),
+            "path_terms": torch.tensor(path_terms, device=self.device),
+            "force_terms": torch.tensor(force_terms, device=self.device),
         }
 
     @property
