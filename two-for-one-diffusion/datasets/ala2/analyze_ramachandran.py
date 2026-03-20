@@ -5,7 +5,42 @@ import mdtraj as md
 import argparse
 from pathlib import Path
 
-from utils import get_psi_angle, get_phi_angle
+from .utils import get_psi_angle, get_phi_angle
+
+def analyze_ramachandran_plot(trajectory, output_path, title="Ramachandran Plot"):
+    """
+    Generate Ramachandran plot for a given trajectory.
+    
+    Parameters
+    ----------
+    trajectory : torch.Tensor
+        Trajectory tensor of shape (n_frames, n_atoms, 3)
+    output_path : str
+        Path where to save the plot
+    title : str
+        Title for the plot
+    """
+    print("Calculating Ramachandran angles...")
+    phi_angle = get_phi_angle(trajectory).flatten()
+    psi_angle = get_psi_angle(trajectory).flatten()
+    
+    plt.figure(figsize=(8, 6))
+    
+    # Plot scatter
+    plt.scatter(phi_angle.detach().cpu(), psi_angle.detach().cpu(),
+               alpha=0.5, s=10, c='blue')
+    
+    plt.xlabel('φ (Phi)')
+    plt.ylabel('ψ (Psi)')
+    plt.title(title)
+    
+    # Set axis limits to show full -pi to pi range
+    plt.xlim(-np.pi, np.pi)
+    plt.ylim(-np.pi, np.pi)
+    
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Ramachandran plot saved to: {output_path}")
 
 def main():
     parser = argparse.ArgumentParser(description="Analyze Ramachandran angles from trajectory")

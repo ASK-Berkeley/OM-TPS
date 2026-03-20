@@ -6,7 +6,7 @@ import numpy as np
 import mdtraj as md
 
 from tqdm import tqdm
-from actions import BOLTZMAN, PICOSEC2TIMEU, TIMEFACTOR
+from .actions import BOLTZMAN, PICOSEC2TIMEU, TIMEFACTOR
 
 def save_ovito_traj(
     positions,

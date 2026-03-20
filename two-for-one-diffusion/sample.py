@@ -28,6 +28,7 @@ from evaluate.evaluate_fastfolders import (
     CLUSTER_ENDPOINTS_ALL_ATOM,
 )
 from evaluate.evaluate_ala2 import evaluate_ala2, CLUSTER_ENDPOINTS_ALA
+from datasets.ala2.ala2_bfgs_multipath import bfgs_multipath_optimization
 
 from evaluate.evaluate_tetrapeptides import evaluate_tetrapeptide
 from evaluate.evaluators import (
@@ -1068,6 +1069,36 @@ def generate_samples(
         )
 
     elif "alanine" in args.mol:
+        # Run BFGS optimization on OM interpolated samples if gen_mode is om_interpolate
+        if samp_args.gen_mode == "om_interpolate":
+            print("\n" + "="*80)
+            print("Running classical BFGS relaxation on OM interpolated paths...")
+            print("="*80 + "\n")
+            
+            # Construct path to the sample file
+            eval_folder = os.path.join(
+                "./saved_models",
+                f"alanine_dipeptide/main_eval_output_{samp_args.gen_mode}"
+                + (f"_{samp_args.original_append_exp_name}" if samp_args.original_append_exp_name else "")
+            )
+            sample_path = os.path.join(eval_folder, f"sample-{samp_args.gen_mode}.pt")
+            
+            # Run BFGS optimization
+            if os.path.exists(sample_path):
+                bfgs_multipath_optimization(
+                    position_tensor_path=sample_path,
+                    n_paths=samp_args.num_samples_eval,
+                    path_length=samp_args.initial_guess_level,  # Use the path length from sampling
+                    steps=20000,  # Can be adjusted
+                    precision="float32",
+                    device=None,  # Auto-detect
+                    disable_logging=samp_args.disable_logging,
+                    output_suffix="_classical_relaxed"
+                )
+            else:
+                print(f"Warning: Sample file not found at {sample_path}, skipping BFGS optimization")
+        
+        # Now run evaluation (will use relaxed version if it exists)
         evaluate_ala2(
             gen_mode=samp_args.gen_mode,
             append_exp_name=samp_args.original_append_exp_name,

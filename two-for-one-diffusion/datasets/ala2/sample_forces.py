@@ -260,8 +260,8 @@ class SampleForces:
                         nb_dist,
                         ava_idx,
                         self.par.mapped_atom_types,
-                        self.par.get_AB()[0],
-                        self.par.get_AB()[1],
+                        self.par.A,
+                        self.par.B,
                         self.switch_dist,
                         self.cutoff,
                         explicit_forces,
@@ -272,7 +272,7 @@ class SampleForces:
                         nb_dist,
                         ava_idx,
                         self.par.mapped_atom_types,
-                        self.par.get_AB()[0],
+                        self.par.A,
                         explicit_forces,
                     )
                     pp = pp + E.sum()
@@ -281,10 +281,10 @@ class SampleForces:
                         nb_dist,
                         ava_idx,
                         self.par.mapped_atom_types,
-                        self.par.get_AB()[1],
+                        self.par.B,
                         explicit_forces,
                     )
-                    pp = pp + E.sum()
+                    pp = pp + E.sum()   
                 else:
                     continue
 

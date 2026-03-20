@@ -48,19 +48,20 @@ def evaluate_ala2(
 ):
 
     append_exp_name_str = "_" + append_exp_name if append_exp_name else ""
-    if atom_selection == AtomSelection.PROTEIN:
-        eval_folder = os.path.join(
-            checkpoint_folder,
-            f"alanine_dipeptide/main_eval_output_{gen_mode}{append_exp_name_str}",
-        )
-    else:
-        eval_folder = os.path.join(
-            checkpoint_folder,
-            f"alanine/fold{fold}/main_eval_output_{gen_mode}{append_exp_name_str}",
-        )
+    eval_folder = os.path.join(
+        checkpoint_folder,
+        f"alanine_dipeptide/main_eval_output_{gen_mode}{append_exp_name_str}",
+    )
 
     # include parent dir for references
     sample_path = Path(eval_folder, f"sample-{gen_mode}.pt")
+    
+    # Check if classical relaxed version exists and use it
+    relaxed_path = Path(eval_folder, f"sample-{gen_mode}_classical_relaxed.pt")
+    if relaxed_path.exists():
+        print(f"Using classically relaxed trajectory: {relaxed_path}")
+        sample_path = relaxed_path
+    
     pdb_file = os.path.join(pdb_folder, f"folded_pdbs/ala2_cg.pdb")
     # Load sampled molecules
     sampled_mol = torch.load(sample_path, weights_only=True)
