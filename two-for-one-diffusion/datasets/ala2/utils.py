@@ -5,6 +5,9 @@ import numpy as np
 
 import mdtraj as md
 
+from tqdm import tqdm
+from actions import BOLTZMAN, PICOSEC2TIMEU, TIMEFACTOR
+
 def save_ovito_traj(
     positions,
     filename,
@@ -121,3 +124,88 @@ def get_psi_angle(R):
 def get_phi_angle(R):
     return get_descriptors(R, dihedral_dict["phi"])
 
+def warmup_langevin(system, force_func, n_steps=50, dt=1, T=100, gamma=1, device="cpu"):
+    # Run Langevin dynamics
+
+    # Initialize velocities# Set up Langevin parameters
+    dt =torch.tensor(dt / TIMEFACTOR, device=device, dtype=system.pos.dtype)  # Convert to picoseconds
+    gamma = torch.tensor(gamma / PICOSEC2TIMEU, device=device, dtype=system.pos.dtype)
+    M = system.M
+
+    v = torch.randn_like(system.pos) * torch.sqrt(BOLTZMAN * T / M)
+    with torch.no_grad():
+        with tqdm(total=n_steps, desc="Running Langevin dynamics") as pbar:
+            for step in range(n_steps):
+                # Compute forces
+                _, forces = force_func(system.pos)
+                
+                # Update positions and velocities
+                # Deterministic part: forces/M - gamma*v
+                # Stochastic part: sqrt(2D*dt) * noise
+                v = v + (forces / M - gamma * v) * dt + torch.randn_like(v) * torch.sqrt(2* BOLTZMAN * T * gamma / M *dt)
+                system.pos = system.pos + v * dt
+                
+                    
+                pbar.update(1)
+
+def short_minimize(system, force_func, n_steps=50, step_size=0.001, device="cpu"):
+    # Run Langevin dynamics
+
+    # Initialize velocities# Set up Langevin parameters
+    M = system.M
+    with torch.no_grad():
+        with tqdm(total=n_steps, desc="Running Langevin dynamics") as pbar:
+            for step in range(n_steps):
+                # Compute forces
+                _, forces = force_func(system.pos)
+
+                system.pos += forces / M * step_size
+                    
+                pbar.update(1)
+
+
+def optimize_endpoints(system, force_func, n_steps=5000):
+
+    system.pos = system.pos.detach().clone()
+    system.pos.requires_grad = True
+    # Set up optimizer
+    optimizer = torch.optim.LBFGS(
+        [system.pos],
+        history_size=10,
+        tolerance_change=1e-6,
+        max_iter=n_steps,
+        line_search_fn="strong_wolfe"
+    )
+
+    # Optimization loop
+    with tqdm(total=n_steps, desc="Optimizing endpoints") as pbar:
+        def closure():
+            optimizer.zero_grad()
+            energy, forces = force_func(system.pos)
+            forces[1:-1] = 0.0
+            system.pos.grad = -forces
+            pbar.set_postfix(energy=f"{energy.sum().item():.4f}")
+            pbar.update(1)
+            return energy[0] + energy[-1]
+
+        optimizer.step(closure)
+
+def replace_endpoints(system):
+    new_coords = system.pos.detach().clone()
+    reactants = torch.load("data/reactants_opt.pt")
+    products = torch.load("data/products_opt.pt")
+    new_coords[0] = reactants
+    new_coords[-1] = products
+    new_coords.requires_grad = True
+    system.pos = new_coords
+    return system
+
+def replace_multipathendpoints(system, n_paths):
+    new_coords = system.pos.detach().clone().reshape(n_paths, -1, 22, 3)
+    reactants = torch.load("data/reactants_opt.pt")
+    products = torch.load("data/products_opt.pt")
+    
+    new_coords[:,0] = reactants.repeat(n_paths, 1, 1)
+    new_coords[:,-1] = products.repeat(n_paths, 1, 1)
+    new_coords.requires_grad = True
+    return new_coords

@@ -197,6 +197,58 @@ class ZeroTAction(torch.nn.Module):
         assert(first_term.shape == second_term.shape)
 
         return first_term.sum(axis = (1,2)).mean(), second_term.sum(axis = (1,2)).mean(), torch.tensor(0.0), energy
+
+
+class ZeroTActionMultiPath(torch.nn.Module):
+
+    """
+    Action that is the same as S2 Action but calculates laplacian using finite differences.
+
+    Units expected:
+        - dt - femtoseconds
+        - gamma - 1/picoseconds
+        - M - atomic units (amu)
+        - T - Kelvin
+
+    Energy is then in kcal/mol
+    """
+    def __init__(self, force_func, dt=1.0, gamma=1.0, laplace_forces=None, M=None, T=None, N=1, n_paths=1):
+        super(ZeroTActionMultiPath, self).__init__()
+        self.dt = dt / TIMEFACTOR
+        self.gamma = gamma / PICOSEC2TIMEU
+        self.N = N
+        self.M = M
+        self.T = T
+        self.laplace_forces = laplace_forces
+        self.force_func = force_func
+        self.n_paths = n_paths
+        #Mass weighted 
+        self.zeta = self.gamma * M
+        self.D = BOLTZMAN * self.T / self.zeta
+        
+
+    def forward(self, path: torch.Tensor, forces: torch.Tensor = None):
+
+        paths = path.reshape(self.n_paths, -1, path.shape[-2], path.shape[-1])
+
+        x_n = paths[:,:-1]
+        x_np = paths[:,1:]
+        energies_full, f_n_full = self.force_func(path)
+
+        f_n = f_n_full.reshape(self.n_paths, -1, path.shape[-2], path.shape[-1])[:,:-1]
+        
+        # Make sure the terms are [batch, 1] as is the third term
+        first_term = torch.square((x_np - x_n)) * (self.zeta / 4 / self.dt)
+
+        second_term = torch.square(f_n) * (
+            self.dt / 4 / self.zeta
+        )
+
+        assert(first_term.shape == second_term.shape)
+
+        #print(first_term.sum(axis = (2,3)).mean(), second_term.sum(axis = (2,3)).mean())
+        #asdasd
+        return first_term.sum(axis = (2,3)).mean(), second_term.sum(axis = (2,3)).mean(), torch.tensor(0.0), energies_full
     
 
 
@@ -222,5 +274,35 @@ class ExpandingAction(torch.nn.Module):
         ), axis=-1)
 
         return first_term.sum(), second_term.sum(), energies.sum()
+
+class ExpandingActionMultiPath(torch.nn.Module):
+    """
+    Simple action with variable parameters used to generate initial guess.
+    """
+
+    def __init__(self, force_func, n_paths):
+        super(ExpandingActionMultiPath, self).__init__()
+        self.force_func = force_func
+        self.n_paths = n_paths
+
+    
+    def forward(self, path: torch.Tensor, k = None):
+
+        paths = path.reshape(self.n_paths, -1, path.shape[-2], path.shape[-1])
+
+        x_n = paths[:-1]
+        x_np = paths[1:]
+        energies_full, f_n_full = self.force_func(path)
+
+        energies = energies_full.reshape(self.n_paths, -1)
+        f_n = f_n_full.reshape(self.n_paths, -1, path.shape[-2], path.shape[-1])
+
+
+        first_term = torch.sum(torch.square((x_np - x_n)) * (k / 4), axis=-1)
+        second_term = torch.sum(torch.square(f_n) * (
+            1 / 4 / k
+        ), axis=-1)
+
+        return first_term.sum(axis = (1,2)).mean(), second_term.sum(axis = (1,2)).mean(), energies.sum()
     
     

@@ -1,5 +1,6 @@
-from actions import FDAction, ZeroTAction, HutchinsonAction
-from utils import center_zero
+from actions import ZeroTActionMultiPath
+from utils import center_zero, short_minimize, save_ovito_traj, replace_multipathendpoints
+
 from molecule_reader import load_ala2_data
 
 import wandb
@@ -14,9 +15,9 @@ from torch.func import vmap
 
 import numpy as np
 
-from utils import save_ovito_traj
-
 import os
+
+from matplotlib import pyplot as plt
 
 
 parser = argparse.ArgumentParser(description="coarse-graining-evaluator")
@@ -43,7 +44,7 @@ parser.add_argument(
     "--initial_guess_method",
     type=str,
     help="method to generate initial interpolation path (options: 'load' or 'linear' or 'expand')",
-    default="load",
+    default="short_optimize",
 )
 
 parser.add_argument(
@@ -51,7 +52,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--steps", type=int, help="number of OM optimization steps", default=1000
+    "--steps", type=int, help="number of OM optimization steps", default=50000
 )
 
 parser.add_argument(
@@ -67,7 +68,7 @@ parser.add_argument(
 parser.add_argument("--om_dt", type=float, help="dt for OM optimization", default=1)
 
 parser.add_argument(
-    "--om_gamma", type=float, help="gamma for OM optimization", default=10
+    "--om_gamma", type=float, help="gamma for OM optimization", default=1
 )
 
 parser.add_argument(
@@ -85,6 +86,12 @@ parser.add_argument(
     default="zeroT",
 )
 
+parser.add_argument(
+    "--device",
+    type=str,
+    help="Use GPU if available",
+    default="cuda:8"
+)
 
 parser.add_argument(
     "--precision",
@@ -94,28 +101,23 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--path_idx",
+    "--n_paths",
     type=int,
-    default=0
-)
-
-parser.add_argument(
-    "--exp_name",
-    type=str,
-    default="default"
+    help="number of paths to optimize",
+    default=8
 )
 
 
 samp_args = parser.parse_args()
-
-device = torch.device(torch.cuda.current_device() if torch.cuda.is_available() else "cpu")
-samp_args.device = device
 
 
 reactants, products, sample_force, sample_forces_laplace, system = load_ala2_data(samp_args)
 n_atoms = system.natoms
 
 data_dir = "result_data"
+
+path_filter = [True, True, False, True, True, True, True, True]
+
 
 if not samp_args.disable_logging:
     # validate_git_status()
@@ -124,7 +126,6 @@ if not samp_args.disable_logging:
         entity="om-interpolation",
         project="all-atom-ala2-bfgs",
         config=samp_args,
-        name = samp_args.exp_name
     )
     data_dir = os.path.join(data_dir, run.name)
     os.makedirs(data_dir, exist_ok=True)
@@ -134,50 +135,42 @@ else:
 
 if samp_args.initial_guess_method == "load":
     run = "pleasant-darkness-14"
-    # position_tensor = torch.load("result_data/" + run + "/unwrapped6.pt", map_location=samp_args.device)
-    position_tensor = torch.load("michael_samples.pt")
-    position_tensor = position_tensor.to(samp_args.device)[samp_args.path_length * samp_args.path_idx:samp_args.path_length * (samp_args.path_idx + 1)]
+    position_tensor = torch.load("result_data/" + run + "/unwrapped6.pt", map_location=samp_args.device)
     position_tensor.requires_grad=True
     system.pos = position_tensor
+elif samp_args.initial_guess_method == "short_optimize":
+    position_tensor = torch.load("data/sample-om_interpolate.pt", map_location=samp_args.device)
+    position_tensor_reshaped = position_tensor.reshape(samp_args.n_paths, -1, 22, 3)
+    position_tensor_reshaped = position_tensor_reshaped[path_filter]
+    samp_args.n_paths = position_tensor_reshaped.shape[0]
 
-if samp_args.action == "hutch":
-    action = HutchinsonAction(
-                        force_func=lambda x : vmap(sample_force.compute)(x),
-                        laplace_forces=lambda x : vmap(sample_forces_laplace.compute)(x),
-                        gamma=samp_args.om_gamma,
-                        dt=samp_args.om_dt,
-                        T=samp_args.om_T,
-                        M=system.M,
-                        N=samp_args.laplace_iters
-                    )
-elif samp_args.action == "differences":
-    action = FDAction(
-                        force_func=lambda x : vmap(sample_force.compute)(x),
-                        laplace_forces=lambda x : vmap(sample_forces_laplace.compute)(x),
-                        gamma=samp_args.om_gamma,
-                        dt=samp_args.om_dt,
-                        T=samp_args.om_T,
-                        M=system.M,
-                        N=samp_args.laplace_iters
-                    )
-elif samp_args.action == "zeroT":
-    action = ZeroTAction(
-                        force_func=lambda x : vmap(sample_force.compute)(x),
-                        laplace_forces=lambda x : vmap(sample_forces_laplace.compute)(x),
-                        gamma=samp_args.om_gamma,
-                        dt=samp_args.om_dt,
-                        T=samp_args.om_T,
-                        M=system.M,
-                        N=samp_args.laplace_iters
-                    )
-else:
-    raise ValueError("Unknown action")
+    print(position_tensor.shape)
+    position_tensor = position_tensor_reshaped.reshape(-1, 22, 3)
+    position_tensor.requires_grad=True
+    system.pos = position_tensor
+    #optimize_endpoints(system, lambda x: vmap(sample_force.compute)(x), n_steps=5000)
+    #replace_multipathendpoints(system, samp_args.n_paths)
+    short_minimize(system, lambda x: vmap(sample_force.compute)(x), n_steps=1400, step_size=0.001, device=samp_args.device)
+    replace_multipathendpoints(system, samp_args.n_paths)
+    save_ovito_traj(system.pos.detach().cpu(), os.path.join(data_dir, "init_path.gsd"), bonds=reactants.bonds)
+    torch.save(position_tensor_reshaped.detach().cpu(), os.path.join(data_dir, "init_path.pt"))
+
+action = ZeroTActionMultiPath(
+    force_func=lambda x: vmap(sample_force.compute)(x),
+    laplace_forces=lambda x: vmap(sample_forces_laplace.compute)(x),
+    gamma=samp_args.om_gamma,
+    dt=samp_args.om_dt,
+    T=samp_args.om_T,
+    M=system.M,
+    N=samp_args.laplace_iters,
+    n_paths=samp_args.n_paths
+)
+
 action_func = lambda path: action(path)
 
-
+print(system.pos.shape)
 
 energies = []
-max_energies = []
 actions = []
 path_terms = []
 force_terms = []
@@ -207,9 +200,7 @@ with tqdm(total=samp_args.steps, desc="Processing") as pbar:
 
     def bfgs_closure():
         global pbar
-        path_term, force_term, laplace_term, energy = action_func(system.pos)
-        total_energy = energy.sum()
-        max_energy = energy.max()
+        path_term, force_term, laplace_term, total_energy = action_func(system.pos)
 
         # It seems likely that they are the same. It probably can be proven
         total_action = path_term + force_term
@@ -219,7 +210,9 @@ with tqdm(total=samp_args.steps, desc="Processing") as pbar:
 
         (grads,) = torch.autograd.grad(total_action, system.pos)
         
-        grads[0, :], grads[-1, :] = torch.zeros(n_atoms, 3), torch.zeros(n_atoms,3)
+        grads = grads.reshape(samp_args.n_paths, -1, 22, 3)
+        grads[:,0, :], grads[:,-1, :] = torch.zeros(samp_args.n_paths, n_atoms, 3), torch.zeros(samp_args.n_paths, n_atoms,3)
+        grads = grads.reshape(-1, 22, 3)
         ammount_clipped = (grads - torch.clip(grads, -100, 100)).abs().sum()
         system.pos.grad = grads
 
@@ -230,8 +223,6 @@ with tqdm(total=samp_args.steps, desc="Processing") as pbar:
             path_terms.append(path_term.item())
             force_terms.append(force_term.item())
             laplace_terms.append(laplace_term.item())
-            energies.append(total_energy.item())
-            max_energies.append(max_energy.item())
             path_contribution = path_term.abs().item() / term_sum * 100
             force_contribution = force_term.abs().item() / term_sum * 100
             laplace_contribution = abs(laplace_term.item()) / term_sum * 100
@@ -247,9 +238,8 @@ with tqdm(total=samp_args.steps, desc="Processing") as pbar:
                         "Path Contribution": path_contribution,
                         "Force Contribution": force_contribution,
                         "Laplace Contribution": laplace_contribution,
-                        "Total energy": total_energy,
-                        "Max energy": max_energy,
-                        "Ammount clipped": ammount_clipped
+                        "Ammount clipped": ammount_clipped,
+                        "Max energy": total_energy.max()
                         })
 
         pbar.set_postfix(cost=f"action: {total_action.item():.4f}")   
@@ -260,12 +250,39 @@ with tqdm(total=samp_args.steps, desc="Processing") as pbar:
 
     optimizer = torch.optim.LBFGS([system.pos],
                             history_size=10, 
-                            tolerance_change=1e-6,
+                            tolerance_change=1e-12,
                             max_iter=samp_args.steps, 
                             line_search_fn="strong_wolfe")
     optimizer.step(bfgs_closure)
     
+final_traj_reshaped = system.pos.detach().cpu().reshape(samp_args.n_paths, -1, 22, 3)
 
+save_ovito_traj(system.pos.detach().cpu(), os.path.join(data_dir, "final_traj.gsd"), bonds=reactants.bonds)
+torch.save(final_traj_reshaped.detach().cpu(), os.path.join(data_dir, "final_traj.pt"))
 
-save_ovito_traj(system.pos.detach().cpu(), os.path.join(data_dir, f"warmup_unwrapped_{samp_args.path_idx}.gsd"), bonds=reactants.bonds)
-torch.save(system.pos.detach().cpu(), os.path.join(data_dir, f"unwrapped_{samp_args.path_idx}.pt"))
+# Calculate and save energy along the path
+print(system.pos.shape)
+E, f = vmap(sample_force.compute)(system.pos)
+torch.save(E, os.path.join(data_dir, "final_energy.pt"))
+
+E_reshaped = E.detach().cpu().reshape(samp_args.n_paths, -1)
+print(E_reshaped.shape)
+
+# Plot and save energy profile
+plt.figure(figsize=(10, 6))
+for i in range(E_reshaped.shape[0]):
+    plt.plot(E_reshaped[i].detach().cpu().numpy(), label=f'Path {i+1}')
+plt.title("Energy along the path")
+plt.xlabel("Path index")
+plt.ylabel("Energy")
+plt.legend()
+plt.savefig(os.path.join(data_dir, 'energy_profile.png'))
+plt.close()
+
+if not samp_args.disable_logging:
+    wandb.log({
+        "Final_Energy_Profile": wandb.Image(os.path.join(data_dir, 'energy_profile.png')),
+        "Final_Max_Energy": E.max().item(),
+        "Final_Min_Energy": E.min().item(),
+        "Final_Mean_Energy": E.mean().item()
+    }) 
