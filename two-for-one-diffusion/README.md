@@ -7,7 +7,7 @@ Make sure the ```om-tps``` and ```openmm-env```conda environments are set up as 
 
 ### Data
 #### Alanine Dipeptide
-We provide torch tensors containing coordinates of MD simulations run at various temperatures. The diffusion model used for OM interpolation is trained on this data. Access at this Google Drive [link](). Unzip the ```Ala2Train.zip``` file and place it in the ```datasets``` folder.
+We provide torch tensors containing coordinates of MD simulations run at various temperatures. The diffusion model used for OM interpolation is trained on this data. Access at this Google Drive [link](https://drive.google.com/file/d/1fS3s4yxb3WF_X_h02Rrq9sSYLvaWgBsG/view?usp=sharing). Unzip the ```Ala2Train.zip``` file and place it in the ```datasets``` folder.
 
 #### Fast Folding Proteins
 We provide torch tensors containing coordinates of the coarse-grained fast-folding protein trajectories from D.E.Shaw, from which transition path endpoints are extracted.
