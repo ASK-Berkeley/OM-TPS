@@ -62,9 +62,6 @@ def traj_to_atom14(traj):
     arr = np.zeros((traj.n_frames, traj.n_residues, 14, 3), dtype=np.float16)
     for i, resi in enumerate(traj.top.residues):
         for at in resi.atoms:
-            import pdb
-
-            pdb.set_trace()
             if at.name not in rc.restype_name_to_atom14_names[resi.name]:
                 print(resi.name, at.name, "not found")
                 continue
@@ -99,9 +96,6 @@ else:
         except:
             return
         traj.superpose(traj)
-        import pdb
-
-        pdb.set_trace()
         arr = traj_to_atom14(traj)
         np.save(f"{args.outdir}/{name}{args.suffix}.npy", arr[:: args.stride])
 
