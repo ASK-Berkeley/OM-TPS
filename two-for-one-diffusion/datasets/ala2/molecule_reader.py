@@ -56,7 +56,6 @@ def load_ala2_data(args):
     #print(sample_forces.compute(torch.tensor(reactants.coords)))
     if system.pos.dtype != args.precision:
         system.pos = system.pos.to(dtype=precision)
-    e, example_forces = vmap(sample_forces.compute)(system.pos)
     #print(example_forces[0,0,0])
     #sample_grad = torch.autograd.grad(example_forces[0,0,0], system.pos)
     #print(sample_grad)

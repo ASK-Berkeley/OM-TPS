@@ -154,7 +154,7 @@ def short_minimize(system, force_func, n_steps=50, step_size=0.001, device="cpu"
     # Initialize velocities# Set up Langevin parameters
     M = system.M
     with torch.no_grad():
-        with tqdm(total=n_steps, desc="Running Langevin dynamics") as pbar:
+        with tqdm(total=n_steps, desc="Running Energy Minimization") as pbar:
             for step in range(n_steps):
                 # Compute forces
                 _, forces = force_func(system.pos)

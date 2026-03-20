@@ -31,66 +31,22 @@ parser.add_argument(
     help="directory root where data is stored, if None (default) work with empty datasets and saved reference from saved_histograms",
 )
 
-parser.add_argument(
-    "--parallel_sim", type=int, default=2, help="Number of parallel simulations UNUSED"
-)
-parser.add_argument(
-    "--save_interval", type=int, default=250, help="save interval (in timesteps)"
-)
-
-parser.add_argument("--write_every", type=int, default=100, help="when to write")
 
 parser.add_argument(
-    "--initial_guess_method",
-    type=str,
-    help="method to generate initial interpolation path (options: 'load' or 'linear' or 'expand')",
-    default="short_optimize",
+    "--steps", type=int, help="number of OM optimization steps", default=20000
 )
 
-parser.add_argument(
-    "--path_length", type=int, help="length of interpolation path", default=200
-)
-
-parser.add_argument(
-    "--steps", type=int, help="number of OM optimization steps", default=50000
-)
-
-parser.add_argument(
-    "--optimizer",
-    type=str,
-    help="Which action to use. Options: adam, sgd",
-    default="adam",
-)
-
-parser.add_argument(
-    "--lr", type=float, help="learning rate for OM optimization", default=1e-6
-)
 parser.add_argument("--om_dt", type=float, help="dt for OM optimization", default=1)
 
 parser.add_argument(
-    "--om_gamma", type=float, help="gamma for OM optimization", default=1
-)
-
-parser.add_argument(
-    "--om_T", type=float, help="Temperature for OM optimization", default=300
-)
-
-parser.add_argument(
-    "--laplace_iters", type=int, help="Number of internal iterations in the laplace calculations", default=1
-)
-
-parser.add_argument(
-    "--action",
-    type=str,
-    help="Which action to use. Options: hutch, differences",
-    default="zeroT",
+    "--om_gamma", type=float, help="gamma for OM optimization", default=10
 )
 
 parser.add_argument(
     "--device",
     type=str,
-    help="Use GPU if available",
-    default="cuda:8"
+    help="Device to use for computation (default: auto-detect GPU or CPU)",
+    default=None
 )
 
 parser.add_argument(
@@ -107,24 +63,54 @@ parser.add_argument(
     default=8
 )
 
+parser.add_argument(
+    "--position_tensor_path",
+    type=str,
+    help="path to the position tensor file to load",
+    default="saved_models/alanine_dipeptide/main_eval_output_om_interpolate/sample-om_interpolate.pt"
+)
+
+parser.add_argument(
+    "--path_length",
+    type=int,
+    help="length of interpolation path",
+    default=300
+)
+
+parser.add_argument(
+    "--wandb_project",
+    type=str,
+    help="wandb project name for logging",
+    default="om-diffusion-experiments"
+)
+
 
 samp_args = parser.parse_args()
 
+# Auto-detect device if not specified
+if samp_args.device is None:
+    if torch.cuda.is_available():
+        samp_args.device = f"cuda:{torch.cuda.current_device()}"
+    else:
+        samp_args.device = "cpu"
+
+print(f"Using device: {samp_args.device}")
 
 reactants, products, sample_force, sample_forces_laplace, system = load_ala2_data(samp_args)
 n_atoms = system.natoms
+path_length = system.pos.shape[0]
+assert path_length == samp_args.path_length, "Path length does not match"
 
-data_dir = "result_data"
+data_dir = os.path.dirname(samp_args.position_tensor_path)
 
-path_filter = [True, True, False, True, True, True, True, True]
+path_filter = [True, True, True, True, True, True, True, True]
 
 
 if not samp_args.disable_logging:
     # validate_git_status()
     wandb.login()
     run = wandb.init(
-        entity="om-interpolation",
-        project="all-atom-ala2-bfgs",
+        project=samp_args.wandb_project,
         config=samp_args,
     )
     data_dir = os.path.join(data_dir, run.name)
@@ -133,42 +119,35 @@ else:
     data_dir = os.path.join(data_dir, "default")
     os.makedirs(data_dir, exist_ok=True)
 
-if samp_args.initial_guess_method == "load":
-    run = "pleasant-darkness-14"
-    position_tensor = torch.load("result_data/" + run + "/unwrapped6.pt", map_location=samp_args.device)
-    position_tensor.requires_grad=True
-    system.pos = position_tensor
-elif samp_args.initial_guess_method == "short_optimize":
-    position_tensor = torch.load("data/sample-om_interpolate.pt", map_location=samp_args.device)
-    position_tensor_reshaped = position_tensor.reshape(samp_args.n_paths, -1, 22, 3)
-    position_tensor_reshaped = position_tensor_reshaped[path_filter]
-    samp_args.n_paths = position_tensor_reshaped.shape[0]
+print(f"Loading position tensor from: {samp_args.position_tensor_path}")
+position_tensor = torch.load(samp_args.position_tensor_path, map_location=samp_args.device)
+position_tensor_reshaped = position_tensor.reshape(samp_args.n_paths, -1, 22, 3)
+position_tensor_reshaped = position_tensor_reshaped[path_filter]
+samp_args.n_paths = position_tensor_reshaped.shape[0]
+print(f"Loaded {samp_args.n_paths} paths with shape {position_tensor_reshaped.shape}")
 
-    print(position_tensor.shape)
-    position_tensor = position_tensor_reshaped.reshape(-1, 22, 3)
-    position_tensor.requires_grad=True
-    system.pos = position_tensor
-    #optimize_endpoints(system, lambda x: vmap(sample_force.compute)(x), n_steps=5000)
-    #replace_multipathendpoints(system, samp_args.n_paths)
-    short_minimize(system, lambda x: vmap(sample_force.compute)(x), n_steps=1400, step_size=0.001, device=samp_args.device)
-    replace_multipathendpoints(system, samp_args.n_paths)
-    save_ovito_traj(system.pos.detach().cpu(), os.path.join(data_dir, "init_path.gsd"), bonds=reactants.bonds)
-    torch.save(position_tensor_reshaped.detach().cpu(), os.path.join(data_dir, "init_path.pt"))
+position_tensor = position_tensor_reshaped.reshape(-1, 22, 3)
+position_tensor.requires_grad=True
+system.pos = position_tensor
+#optimize_endpoints(system, lambda x: vmap(sample_force.compute)(x), n_steps=5000)
+#replace_multipathendpoints(system, samp_args.n_paths)
+print("Starting energy minimization (1400 steps)...")
+short_minimize(system, lambda x: vmap(sample_force.compute)(x), n_steps=1400, step_size=0.001, device=samp_args.device)
+print("Energy minimization complete")
+replace_multipathendpoints(system, samp_args.n_paths)
+save_ovito_traj(system.pos.detach().cpu(), os.path.join(data_dir, "init_path.gsd"), bonds=reactants.bonds)
+torch.save(position_tensor_reshaped.detach().cpu(), os.path.join(data_dir, "init_path.pt"))
 
 action = ZeroTActionMultiPath(
     force_func=lambda x: vmap(sample_force.compute)(x),
-    laplace_forces=lambda x: vmap(sample_forces_laplace.compute)(x),
     gamma=samp_args.om_gamma,
     dt=samp_args.om_dt,
-    T=samp_args.om_T,
     M=system.M,
-    N=samp_args.laplace_iters,
     n_paths=samp_args.n_paths
 )
 
 action_func = lambda path: action(path)
 
-print(system.pos.shape)
 
 energies = []
 actions = []
@@ -176,7 +155,6 @@ path_terms = []
 force_terms = []
 laplace_terms = []
 
-path_length = system.pos.shape[0]
 
 new_path = center_zero(system.pos.detach())
 np_path = new_path.detach().cpu().numpy()
@@ -192,8 +170,9 @@ system.pos = new_path
 precision = torch.float32 if samp_args.precision=="float32" else torch.float64
 if system.pos.dtype != samp_args.precision:
     system.pos = system.pos.to(dtype=precision)
-print(system.pos.dtype)
 
+print(f"\nStarting OM action optimization with LBFGS ({samp_args.steps} max iterations)")
+print(f"Parameters: dt={samp_args.om_dt}, gamma={samp_args.om_gamma}")
 
 with tqdm(total=samp_args.steps, desc="Processing") as pbar:
 
@@ -204,7 +183,6 @@ with tqdm(total=samp_args.steps, desc="Processing") as pbar:
 
         # It seems likely that they are the same. It probably can be proven
         total_action = path_term + force_term
-        #print(total_action.item(), terms)
 
         actions.append(total_action.item())
 
@@ -254,19 +232,21 @@ with tqdm(total=samp_args.steps, desc="Processing") as pbar:
                             max_iter=samp_args.steps, 
                             line_search_fn="strong_wolfe")
     optimizer.step(bfgs_closure)
+
+print("\nOM optimization complete!")
     
 final_traj_reshaped = system.pos.detach().cpu().reshape(samp_args.n_paths, -1, 22, 3)
 
+print(f"Saving results to: {data_dir}")
 save_ovito_traj(system.pos.detach().cpu(), os.path.join(data_dir, "final_traj.gsd"), bonds=reactants.bonds)
 torch.save(final_traj_reshaped.detach().cpu(), os.path.join(data_dir, "final_traj.pt"))
 
 # Calculate and save energy along the path
-print(system.pos.shape)
 E, f = vmap(sample_force.compute)(system.pos)
 torch.save(E, os.path.join(data_dir, "final_energy.pt"))
 
 E_reshaped = E.detach().cpu().reshape(samp_args.n_paths, -1)
-print(E_reshaped.shape)
+print(f"Final energy - Min: {E.min().item():.4f}, Max: {E.max().item():.4f}, Mean: {E.mean().item():.4f} kcal/mol")
 
 # Plot and save energy profile
 plt.figure(figsize=(10, 6))

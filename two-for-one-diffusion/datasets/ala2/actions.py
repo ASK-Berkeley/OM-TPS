@@ -167,18 +167,14 @@ class ZeroTAction(torch.nn.Module):
 
     Energy is then in kcal/mol
     """
-    def __init__(self, force_func, dt=1.0, gamma=1.0, laplace_forces=None, M=None, T=None, N=1):
+    def __init__(self, force_func, dt=1.0, gamma=1.0, M=None):
         super(ZeroTAction, self).__init__()
         self.dt = dt / TIMEFACTOR
         self.gamma = gamma / PICOSEC2TIMEU
-        self.N = N
         self.M = M
-        self.T = T
-        self.laplace_forces = laplace_forces
         self.force_func = force_func
         #Mass weighted 
         self.zeta = self.gamma * M
-        self.D = BOLTZMAN * self.T / self.zeta
         
 
     def forward(self, path: torch.Tensor, forces: torch.Tensor = None):
@@ -208,23 +204,18 @@ class ZeroTActionMultiPath(torch.nn.Module):
         - dt - femtoseconds
         - gamma - 1/picoseconds
         - M - atomic units (amu)
-        - T - Kelvin
 
     Energy is then in kcal/mol
     """
-    def __init__(self, force_func, dt=1.0, gamma=1.0, laplace_forces=None, M=None, T=None, N=1, n_paths=1):
+    def __init__(self, force_func, dt=1.0, gamma=1.0, M=None, n_paths=1):
         super(ZeroTActionMultiPath, self).__init__()
         self.dt = dt / TIMEFACTOR
         self.gamma = gamma / PICOSEC2TIMEU
-        self.N = N
         self.M = M
-        self.T = T
-        self.laplace_forces = laplace_forces
         self.force_func = force_func
         self.n_paths = n_paths
         #Mass weighted 
         self.zeta = self.gamma * M
-        self.D = BOLTZMAN * self.T / self.zeta
         
 
     def forward(self, path: torch.Tensor, forces: torch.Tensor = None):
