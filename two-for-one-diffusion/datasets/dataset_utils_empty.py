@@ -211,6 +211,7 @@ def get_dataset(
     committor_remove_range=[],  # range of committor values to remove
     remove_freq=0,  # frequency of removing clusters from data
     tetra_atom_selection="all-atom",
+    temperature: float = 1000.0, # only for alanine dipeptide
 ):
     """
     Get dataset for a specific molecule.
@@ -233,7 +234,7 @@ def get_dataset(
     if mol.lower() == "alanine_dipeptide":
         # All-atom alanine dipeptide dataset
 
-        dataset = AlanineDipeptideDataset_AllAtom(data_folder)
+        dataset = AlanineDipeptideDataset_AllAtom(data_folder, temperature=temperature)
 
         if data_folder is not None:
             print(f"Creating dataset splits")
@@ -525,13 +526,20 @@ class AlanineDipeptideDataset_AllAtom(CGDataset):
         transform: Optional[Callable[[Any], Any]] = None,
         return_bond_graph: bool = False,
         align: bool = False,
+        temperature: float = 1000.0,
     ):
         self.data_root = data_root
         pdb_file = "./datasets/folded_pdbs/ala2.pdb"
         self.topology = md.load(pdb_file).topology
-        
-        xyz = None
-
+        if data_root is None:
+            xyz = None
+        else:
+            xyz = torch.load(
+                os.path.join(data_root, f"trajectories{temperature}K.pt"),
+                weights_only=True,
+            )
+            xyz = xyz.reshape(-1, 22, 3)
+            
         super().__init__(xyz, self.topology, "alanine_dipeptide", mean0=True)
 
 

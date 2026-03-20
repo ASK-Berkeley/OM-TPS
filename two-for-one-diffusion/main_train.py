@@ -344,6 +344,13 @@ parser.add_argument(
     help="set True to do save all checkpoints not only the best crossvalidated one",
 )
 
+parser.add_argument(
+    "--ala2_temperature",
+    type=float,
+    default=1000.0,
+    help="temperature for alanine dipeptide dataset",
+)
+
 args = parser.parse_args()
 args.backbone_network = "graph-transformer"
 
@@ -365,7 +372,7 @@ if __name__ == "__main__":
         raise ValueError("Unknown atom selection")
 
     tic_evaluator = None
-    if args.mol.lower() in all_molecules:
+    if args.mol.upper() in Molecules.__members__:
         tic_evaluator = TicEvaluator(
             val_data=None,
             mol_name=args.mol,
@@ -389,6 +396,7 @@ if __name__ == "__main__":
         committor_remove_range=args.committor_remove_range,  # range of committor values to remove
         remove_freq=args.remove_freq,  # frequency of removing clusters from data,
         tetra_atom_selection=args.atom_selection,
+        temperature=args.ala2_temperature, # only for alanine dipeptide
     )
 
     norm_factor = trainset.std if args.scale_data else 1.0

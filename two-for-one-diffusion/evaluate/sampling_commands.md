@@ -318,5 +318,26 @@ python sample.py \
 
 ### Model Pretraining
 ```bash
+python main_train.py \
+    --mol alanine_dipeptide \
+    --atom_selection protein \
+    --data_folder datasets/Ala2Train \
+    --ala2_temperature 1000 \
+    --eval_interval 1000 \
+    --experiment_name ala2_all_atom_1000K_intrinsic_coords \
+    --use_intrinsic_coords True \
+    --use_abs_coords False \
+    --use_distances False \
+    --hidden_features_gnn 64 \
+    --heads 8 \
+    --dim_head 64 \
+    --batch_size 2048 \
+    --train_iter 50000 \
+    --weight_decay 0 \
+    --warmup_proportion 0.05 \
+    --learning_rate 4e-4 \
+    --min_lr_cosine_anneal 0 \
+    --num_samples 100 \
+    --iterations_on_val 1
 
 ```

@@ -302,6 +302,13 @@ parser.add_argument(
     help="Instead of taking gradient through the diffusion model forces, just follow the forces",
 )
 
+parser.add_argument(
+    "--ala2_temperature",
+    type=float,
+    default=1000.0,
+    help="temperature for alanine dipeptide dataset",
+)
+
 samp_args = parser.parse_args()
 
 
@@ -414,6 +421,7 @@ def main(samp_args):
         samp_args.atom_selection,
         shuffle_before_splitting=args.shuffle_data_before_splitting,
         tetra_atom_selection=atom_selection,
+        temperature=samp_args.ala2_temperature, # only for alanine dipeptide
     )
 
     norm_factor = trainset.std if args.scale_data else 1.0

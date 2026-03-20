@@ -897,7 +897,7 @@ class GaussianDiffusion(nn.Module):
         if z is not None:
             # mask out padded losses
             padding_idx = z == 0
-            loss = loss[~padding_idx]
+            loss = loss[:, ~padding_idx]
 
         # loss = reduce(loss, "b ... -> b (...)", "mean")
 
